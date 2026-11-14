@@ -12,7 +12,7 @@ jobs:
     permissions:
       contents: write # only used to publish releases on tags
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Test
         run: swift test
@@ -25,7 +25,7 @@ jobs:
           ./scripts/bundle.sh
           ditto -c -k --keepParent build/Islet.app build/Islet.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: Islet
           path: build/Islet.zip
