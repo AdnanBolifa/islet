@@ -23,7 +23,7 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Islet shows the current song and lets you play, pause and skip from the notch.</string>
+	<string>Islet shows what's playing in Music, Spotify and your browser's YouTube tabs, and lets you play, pause and skip from the notch.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 </dict>

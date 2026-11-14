@@ -47,3 +47,11 @@ final class StatsTests: XCTestCase {
         if let celsius = TemperatureReader().cpuCelsius() { XCTAssert((1...130).contains(celsius)) }
     }
 }
+
+final class MediaTests: XCTestCase {
+    func testCleansBrowserTabTitles() {
+        XCTAssertEqual(cleanMediaTabTitle("(3) Lofi beats - YouTube"), "Lofi beats")
+        XCTAssertEqual(cleanMediaTabTitle("Song - Artist - YouTube Music"), "Song - Artist")
+        XCTAssertEqual(cleanMediaTabTitle("Plain title"), "Plain title")
+    }
+}

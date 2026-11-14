@@ -7,12 +7,13 @@ import SwiftUI
 // MARK: - Preferences
 
 enum Metric: String, CaseIterable {
-    case cpu, memory, temperature, network, disk
+    case cpu, memory, swap, temperature, network, disk
 
     var title: String {
         switch self {
         case .cpu: "CPU"
         case .memory: "Memory"
+        case .swap: "Swap"
         case .temperature: "Temperature"
         case .network: "Network"
         case .disk: "Disk"
@@ -23,6 +24,7 @@ enum Metric: String, CaseIterable {
         switch self {
         case .cpu: "cpu"
         case .memory: "memorychip"
+        case .swap: "arrow.triangle.swap"
         case .temperature: "thermometer.medium"
         case .network: "arrow.up.arrow.down"
         case .disk: "internaldrive"
@@ -38,7 +40,7 @@ enum Pref {
 
     static func register() {
         var defaults: [String: Any] = [islandVisible: true, islandIdleStats: true, notifications: false]
-        for metric in Metric.allCases { defaults[menu(metric)] = metric != .disk }
+        for metric in Metric.allCases { defaults[menu(metric)] = metric != .disk && metric != .swap }
         UserDefaults.standard.register(defaults: defaults)
     }
 }
@@ -54,8 +56,11 @@ func rateText(_ bytesPerSecond: Double) -> String {
     return megabytes < 10 ? String(format: "%.1fM", megabytes) : "\(Int(megabytes))M"
 }
 
-/// "92G": short enough for a ring or the menu bar.
-func compactBytes(_ bytes: Int64) -> String { "\(Int((Double(bytes) / 1e9).rounded()))G" }
+/// "92G" / "3.4G": short enough for a ring or the menu bar.
+func compactBytes(_ bytes: Int64) -> String {
+    let gigabytes = Double(bytes) / 1e9
+    return gigabytes < 10 ? String(format: "%.1fG", gigabytes) : "\(Int(gigabytes.rounded()))G"
+}
 
 func levelColor(_ value: Double) -> Color { value < 0.6 ? .green : value < 0.85 ? .orange : .red }
 
@@ -82,6 +87,10 @@ final class StatsModel {
 
     /// Temperature as 0...1 for gauges (100 °C = full); falls back to the thermal state on Intel.
     var heatLevel: Double { temperature.map { $0 / 100 } ?? thermal.level }
+    /// Swap compared to RAM size: 0.5 means swap holds half your RAM's worth, which you will feel.
+    var swapLevel: Double { Double(memory.swapUsed) / Double(max(memory.total, 1)) }
+    var swapText: String { compactBytes(Int64(memory.swapUsed)) }
+
     var temperatureText: String { temperature.map { "\(Int($0.rounded()))°" } ?? thermal.label }
 
     func start() {
@@ -132,99 +141,6 @@ extension ProcessInfo.ThermalState {
         case .serious: 0.8
         default: 1
         }
-    }
-}
-
-// MARK: - Now playing
-
-enum Player: String, CaseIterable {
-    case music = "Music", spotify = "Spotify"
-
-    var bundleID: String { self == .music ? "com.apple.Music" : "com.spotify.client" }
-    var changeNotification: String { self == .music ? "com.apple.Music.playerInfo" : "com.spotify.client.PlaybackStateChanged" }
-    var isRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty }
-}
-
-@MainActor @Observable
-final class NowPlayingModel {
-    private(set) var player: Player?
-    private(set) var title: String?
-    private(set) var artist: String?
-    private(set) var artwork: NSImage?
-    private(set) var isPlaying = false
-    @ObservationIgnored private var artworkKey = ""
-
-    init() {
-        // Music and Spotify broadcast every track and state change.
-        for player in Player.allCases {
-            DistributedNotificationCenter.default().addObserver(forName: .init(player.changeNotification), object: nil, queue: .main) { [weak self] note in
-                let info = note.userInfo ?? [:]
-                MainActor.assumeIsolated {
-                    let state = info["Player State"] as? String
-                    self?.set(player, playing: state == "Playing", stopped: state == "Stopped",
-                              title: info["Name"] as? String, artist: info["Artist"] as? String)
-                }
-            }
-        }
-        // Pick up a song that was already playing before Islet launched.
-        for player in Player.allCases where player.isRunning {
-            let script = """
-                if player state is stopped then return ""
-                return (player state as string) & linefeed & (name of current track) & linefeed & (artist of current track)
-                """
-            guard let lines = run(player, script)?.stringValue?.components(separatedBy: "\n"), lines.count == 3 else { continue }
-            set(player, playing: lines[0] == "playing", stopped: false, title: lines[1], artist: lines[2])
-            if isPlaying { break }
-        }
-    }
-
-    func playPause() { send("playpause") }
-    func next() { send("next track") }
-    func previous() { send("previous track") }
-
-    private func send(_ command: String) {
-        guard let player else { return }
-        run(player, command)
-    }
-
-    private func set(_ player: Player, playing: Bool, stopped: Bool, title: String?, artist: String?) {
-        if stopped {
-            if self.player == player { self.player = nil; self.title = nil; self.artist = nil; artwork = nil; isPlaying = false; artworkKey = "" }
-            return
-        }
-        // Another app pausing shouldn't steal the island from the one that's playing.
-        if !playing, isPlaying, self.player != player { return }
-        self.player = player
-        self.title = title
-        self.artist = artist
-        isPlaying = playing
-
-        let key = "\(player)|\(title ?? "")|\(artist ?? "")"
-        guard key != artworkKey else { return }
-        artworkKey = key
-        artwork = nil
-        loadArtwork(player, key: key)
-    }
-
-    private func loadArtwork(_ player: Player, key: String) {
-        switch player {
-        case .music:
-            if let data = run(.music, "get raw data of artwork 1 of current track")?.data { artwork = NSImage(data: data) }
-        case .spotify:
-            guard let link = run(.spotify, "get artwork url of current track")?.stringValue, let url = URL(string: link) else { return }
-            Task {
-                guard let (data, _) = try? await URLSession.shared.data(from: url), artworkKey == key else { return }
-                artwork = NSImage(data: data)
-            }
-        }
-    }
-
-    /// Runs AppleScript against the player. The first call asks the user for Automation permission.
-    @discardableResult
-    private func run(_ player: Player, _ body: String) -> NSAppleEventDescriptor? {
-        guard player.isRunning else { return nil } // never launch the player just to ask about it
-        var error: NSDictionary?
-        return NSAppleScript(source: "tell application \"\(player.rawValue)\"\n\(body)\nend tell")?.executeAndReturnError(&error)
     }
 }
 

@@ -50,6 +50,7 @@ final class StatusBarController: NSObject {
         switch metric {
         case .cpu: stacked("CPU", percentText(stats.cpu), widest: "100%")
         case .memory: stacked("MEM", percentText(stats.memory.fraction), widest: "100%")
+        case .swap: stacked("SWAP", stats.swapText, widest: "9.9G")
         case .temperature: stacked("TEMP", stats.temperatureText, widest: "100°")
         case .network: stacked("↑" + rateText(stats.upload), "↓" + rateText(stats.download), widest: "↓9.9M", even: true)
         case .disk: stacked("FREE", compactBytes(stats.disk.free), widest: "999G")

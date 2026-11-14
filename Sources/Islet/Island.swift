@@ -248,13 +248,20 @@ private struct ExpandedIsland: View {
                     Text(nowPlaying.title ?? "Nothing playing")
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
-                    Text(nowPlaying.player == nil ? "Play something in Music or Spotify" : nowPlaying.artist ?? "")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
+                    if let browser = nowPlaying.browserNeedsJavaScript {
+                        Text("For controls: \(browser.shortName) › Developer › Allow JavaScript from Apple Events")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange.opacity(0.9))
+                            .lineLimit(2)
+                    } else {
+                        Text(nowPlaying.hasSource ? nowPlaying.subtitle : "Play something in Music, Spotify or YouTube")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
-                if nowPlaying.player != nil {
+                if nowPlaying.hasSource && nowPlaying.browserNeedsJavaScript == nil {
                     HStack(spacing: 16) {
                         ControlButton(symbol: "backward.fill", size: 14) { nowPlaying.previous() }
                         ControlButton(symbol: nowPlaying.isPlaying ? "pause.fill" : "play.fill", size: 22) { nowPlaying.playPause() }
@@ -267,6 +274,8 @@ private struct ExpandedIsland: View {
                 Ring(label: "CPU", text: percentText(stats.cpu), value: stats.cpu)
                 Spacer()
                 Ring(label: "Memory", text: percentText(stats.memory.fraction), value: stats.memory.fraction)
+                Spacer()
+                Ring(label: "Swap", text: stats.swapText, value: stats.swapLevel)
                 Spacer()
                 Ring(label: "Temp", text: stats.temperatureText, value: stats.heatLevel)
                 Spacer()

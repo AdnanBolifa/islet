@@ -57,24 +57,17 @@ private struct OverviewView: View {
             StatTile(icon: "cpu", title: "CPU", value: percentText(stats.cpu),
                      detail: "\(ProcessInfo.processInfo.activeProcessorCount) cores", progress: stats.cpu)
             StatTile(icon: "memorychip", title: "Memory", value: formatBytes(memory.used, style: .memory),
-                     detail: "of \(formatBytes(memory.total, style: .memory)) · \(formatBytes(memory.swapUsed, style: .memory)) swap",
-                     progress: memory.fraction)
+                     detail: "of \(formatBytes(memory.total, style: .memory))", progress: memory.fraction)
+            StatTile(icon: "arrow.triangle.swap", title: "Swap", value: formatBytes(memory.swapUsed, style: .memory),
+                     detail: "on disk · restart clears it", progress: stats.swapLevel)
+            StatTile(icon: "network", title: "Network", value: "↓" + rateText(stats.download),
+                     detail: "↑ \(rateText(stats.upload))/s up", progress: nil)
             StatTile(icon: "thermometer.medium", title: "Temperature",
                      value: stats.temperature.map { "\(Int($0.rounded())) °C" } ?? stats.thermal.label,
                      detail: "CPU · \(stats.thermal.label.lowercased())", progress: stats.heatLevel)
             StatTile(icon: "internaldrive", title: "Disk", value: formatBytes(disk.free),
                      detail: "free of \(formatBytes(disk.total))", progress: disk.usedFraction)
         }
-
-        HStack {
-            Label("Network", systemImage: "network").foregroundStyle(.secondary)
-            Spacer()
-            Label(rateText(stats.download) + "/s", systemImage: "arrow.down")
-            Label(rateText(stats.upload) + "/s", systemImage: "arrow.up").padding(.leading, 8)
-        }
-        .font(.callout.monospacedDigit())
-        .padding(12)
-        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -83,7 +76,7 @@ private struct StatTile: View {
     let title: String
     let value: String
     let detail: String
-    let progress: Double
+    let progress: Double? // nil: no bar (e.g. network has no "full")
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -98,8 +91,9 @@ private struct StatTile: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            ProgressView(value: min(max(progress, 0), 1))
-                .tint(levelColor(progress))
+            ProgressView(value: min(max(progress ?? 0, 0), 1))
+                .tint(levelColor(progress ?? 0))
+                .opacity(progress == nil ? 0 : 1) // keeps tiles the same height
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -228,6 +222,7 @@ private struct SettingsView: View {
     @AppStorage(Pref.notifications) private var notifications = false
     @AppStorage(Pref.menu(.cpu)) private var menuCPU = true
     @AppStorage(Pref.menu(.memory)) private var menuMemory = true
+    @AppStorage(Pref.menu(.swap)) private var menuSwap = false
     @AppStorage(Pref.menu(.temperature)) private var menuTemperature = true
     @AppStorage(Pref.menu(.network)) private var menuNetwork = true
     @AppStorage(Pref.menu(.disk)) private var menuDisk = false
@@ -240,6 +235,7 @@ private struct SettingsView: View {
                 HStack(spacing: 6) {
                     Chip(metric: .cpu, isOn: $menuCPU)
                     Chip(metric: .memory, isOn: $menuMemory)
+                    Chip(metric: .swap, isOn: $menuSwap)
                     Chip(metric: .temperature, isOn: $menuTemperature)
                     Chip(metric: .network, isOn: $menuNetwork)
                     Chip(metric: .disk, isOn: $menuDisk)
@@ -298,7 +294,7 @@ private struct SettingsView: View {
             Button { isOn.toggle() } label: {
                 Image(systemName: metric.symbol)
                     .font(.system(size: 13, weight: .medium))
-                    .frame(width: 52, height: 30)
+                    .frame(width: 46, height: 30)
                     .background(isOn ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1),
                                 in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .foregroundStyle(isOn ? Color.accentColor : .secondary)
