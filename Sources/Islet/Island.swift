@@ -249,7 +249,9 @@ private struct ExpandedIsland: View {
                         .font(.system(size: 14, weight: .semibold))
                         .lineLimit(1)
                     if let browser = nowPlaying.browserNeedsJavaScript {
-                        Text("For controls: \(browser.shortName) › Developer › Allow JavaScript from Apple Events")
+                        Text(browser == .safari
+                             ? "For controls: Safari menu bar › Develop › Allow JavaScript from Apple Events"
+                             : "For controls: \(browser.shortName) menu bar › View › Developer › Allow JavaScript from Apple Events")
                             .font(.system(size: 11))
                             .foregroundStyle(.orange.opacity(0.9))
                             .lineLimit(2)
