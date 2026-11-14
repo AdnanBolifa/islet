@@ -3,6 +3,8 @@ import Foundation
 public struct Artifact: Identifiable, Hashable, Sendable {
     public let url: URL
     public let size: Int64
+    /// Shared tool caches (Gradle, npm, Xcode…): safe to delete but slow to re-download, so not preselected.
+    public var isCache = false
     public var id: URL { url }
 }
 
@@ -24,6 +26,21 @@ public enum Cleaner {
     ]
 
     static let fileExtensions: Set<String> = ["apk", "aab", "ipa"]
+
+    static let developerCaches = [
+        "Library/Developer/Xcode/DerivedData", "Library/Developer/Xcode/iOS DeviceSupport",
+        "Library/Caches/CocoaPods", "Library/Caches/org.swift.swiftpm",
+        ".gradle/caches", ".npm/_cacache",
+    ]
+
+    /// Developer tool caches in the home folder that exist on this Mac.
+    public static func scanDeveloperCaches(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [Artifact] {
+        developerCaches
+            .map { home.appending(path: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .map { Artifact(url: $0, size: allocatedSize(of: $0), isCache: true) }
+            .filter { $0.size > 0 }
+    }
 
     /// Finds build artifacts under the given folders, largest first.
     public static func scan(_ roots: [URL]) -> [Artifact] {

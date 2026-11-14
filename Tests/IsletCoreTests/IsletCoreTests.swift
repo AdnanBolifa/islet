@@ -37,5 +37,13 @@ final class StatsTests: XCTestCase {
         var cpu = CPUSampler()
         _ = cpu.sample()
         XCTAssert((0...1).contains(cpu.sample()))
+
+        var network = NetworkSampler()
+        _ = network.sample()
+        let speed = network.sample()
+        XCTAssert(speed.down >= 0 && speed.up >= 0)
+
+        // nil is fine on Intel; on Apple Silicon it must be a plausible reading.
+        if let celsius = TemperatureReader().cpuCelsius() { XCTAssert((1...130).contains(celsius)) }
     }
 }
