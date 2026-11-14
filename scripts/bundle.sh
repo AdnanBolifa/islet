@@ -14,6 +14,9 @@ mkdir -p "$APP/Contents/MacOS"
 cp "$BIN/Islet" "$APP/Contents/MacOS/Islet"
 strip -x "$APP/Contents/MacOS/Islet"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+if [ -n "${VERSION:-}" ]; then # set by CI from the git tag, e.g. 0.2.0
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion ${BUILD_NUMBER:-1}" "$APP/Contents/Info.plist"
+fi
 codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" --entitlements Resources/Islet.entitlements "$APP"
 
 echo "Built $APP ($(du -sh "$APP" | cut -f1))"
