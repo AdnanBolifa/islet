@@ -15,6 +15,8 @@ struct IslandGeometry: Equatable {
     var hasNotch = false
 
     static let expandedWidth: CGFloat = 440
+    static let playingWing: CGFloat = 32
+    static let statsWing: CGFloat = 40
     var expandedHeight: CGFloat { notch.height + 150 }
 
     var panelFrame: CGRect {
@@ -25,8 +27,9 @@ struct IslandGeometry: Equatable {
     func pillSize(expanded: Bool, toast: Toast?, playing: Bool, idleStats: Bool) -> CGSize {
         if expanded { return CGSize(width: Self.expandedWidth, height: expandedHeight) }
         if let toast { return CGSize(width: min(max(notch.width + 200, 380), Self.expandedWidth), height: notch.height + (toast.body == nil ? 38 : 58)) }
-        if playing { return CGSize(width: notch.width + 96, height: notch.height) }
-        if idleStats { return CGSize(width: notch.width + 120, height: notch.height) }
+        // Wings stay slim so they don't crowd the menu bar items next to the notch.
+        if playing { return CGSize(width: notch.width + 2 * Self.playingWing, height: notch.height) }
+        if idleStats { return CGSize(width: notch.width + 2 * Self.statsWing, height: notch.height) }
         // Without a notch the idle island is invisible but still opens on hover.
         return hasNotch ? notch : CGSize(width: notch.width, height: 0)
     }
@@ -214,7 +217,7 @@ private struct Wings<Left: View, Right: View>: View {
             Color.clear.frame(width: notchWidth)
             right.frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 9)
         .frame(height: height)
     }
 }
@@ -225,14 +228,15 @@ private struct WingStat: View {
     let level: Double
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
-            Text(text)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(level > 0.85 ? .red : level > 0.6 ? .orange : .white)
-        }
+        // Text only: "%" reads as CPU and "°" as temperature, and it keeps the wings slim.
         // No number animation here: it would redraw the always-on wings every 2 s and cost idle CPU.
+        Text(text)
+            .font(.system(size: 11, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(level > 0.85 ? .red : level > 0.6 ? .orange : .white)
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityLabel(symbol == "cpu" ? "CPU \(text)" : "Temperature \(text)")
     }
 }
 
